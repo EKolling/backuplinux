@@ -1,0 +1,153 @@
+# Excluindo backups antigos
+if [ ${BACKUP_TYPE} = "OSL" ] || [ ${BACKUP_TYPE} = "OSW" ]; then
+        if [ ${HOW_MANY} = "1" ]; then
+                break
+        else
+                while [ $(${LS} -1 -d "${BACKUP_TREE_DIFF}"// 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.[0-9]{8}' |${WC} -l) -ge ${HOW_MANY} ]; do
+                        if [ $(${LS} -1 -d "${BACKUP_TREE_DIFF}"// 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.[0-9]{8}' |${WC} -l) -lt ${HOW_MANY} ]; then
+                                break
+                        else
+                                OLDER_BACKUP=$(${LS} -1 -d "${BACKUP_TREE_DIFF}"// |${SED} 's/\/$//g' |${EGREP} '.[0-9]{8}' |${HEAD} -n1)
+                                echo
+                                echo "Quantidade de backups armazenados maior que o valor configurado (${HOW_MANY})."
+                                echo
+                                echo -n "Excluindo o backup mais antigo ("${OLDER_BACKUP}")"
+                                ${RM} -rf "${OLDER_BACKUP}"
+                                checkStatus
+                        fi
+                done
+        fi
+elif [ ${BACKUP_TYPE} = "VM" ]; then
+        while [ $(${LS} -1 -d "${BACKUP_TREE_VM}"/* 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.*[0-9]{8}' |${GREP} xva |${WC} -l) -ge ${HOW_MANY} ]; do
+                if [ $(${LS} -1 -d "${BACKUP_TREE_VM}"/* 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.*[0-9]{8}' |${GREP} xva |${WC} -l) -lt ${HOW_MANY} ]; then
+                        break
+                else
+                        OLDER_BACKUP=$(${LS} -1 -d "${BACKUP_TREE_VM}"/* |${SED} 's/\/$//g' |${EGREP} '.*[0-9]{8}' |${GREP} xva |${HEAD} -n1)
+                        echo
+                        echo "Quantidade de backups armazenados maior que o valor configurado (${HOW_MANY})."
+                        echo
+                        echo -n "Excluindo o backup mais antigo ("${OLDER_BACKUP}")"
+                        ${RM} -f "${OLDER_BACKUP}"
+                        checkStatus
+                        echo
+                fi
+# Excluindo backups antigos
+if [ ${BACKUP_TYPE} = "OSL" ] || [ ${BACKUP_TYPE} = "OSW" ]; then
+        if [ ${HOW_MANY} = "1" ]; then
+                break
+        else
+                while [ $(${LS} -1 -d "${BACKUP_TREE_DIFF}"// 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.[0-9]{8}' |${WC} -l) -ge ${HOW_MANY} ]; do
+                        if [ $(${LS} -1 -d "${BACKUP_TREE_DIFF}"// 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.[0-9]{8}' |${WC} -l) -lt ${HOW_MANY} ]; then
+                                break
+                        else
+                                OLDER_BACKUP=$(${LS} -1 -d "${BACKUP_TREE_DIFF}"// |${SED} 's/\/$//g' |${EGREP} '.[0-9]{8}' |${HEAD} -n1)
+                                echo
+                                echo "Quantidade de backups armazenados maior que o valor configurado (${HOW_MANY})."
+                                echo
+                                echo -n "Excluindo o backup mais antigo ("${OLDER_BACKUP}")"
+                                ${RM} -rf "${OLDER_BACKUP}"
+                                checkStatus
+                        fi
+                done
+        fi
+elif [ ${BACKUP_TYPE} = "VM" ]; then
+        while [ $(${LS} -1 -d "${BACKUP_TREE_VM}"/* 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.*[0-9]{8}' |${GREP} xva |${WC} -l) -ge ${HOW_MANY} ]; do
+                if [ $(${LS} -1 -d "${BACKUP_TREE_VM}"/* 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.*[0-9]{8}' |${GREP} xva |${WC} -l) -lt ${HOW_MANY} ]; then
+                        break
+                else
+                        OLDER_BACKUP=$(${LS} -1 -d "${BACKUP_TREE_VM}"/* |${SED} 's/\/$//g' |${EGREP} '.*[0-9]{8}' |${GREP} xva |${HEAD} -n1)
+                        echo
+                        echo "Quantidade de backups armazenados maior que o valor configurado (${HOW_MANY})."
+                        echo
+                        echo -n "Excluindo o backup mais antigo ("${OLDER_BACKUP}")"
+                        ${RM} -f "${OLDER_BACKUP}"
+                        checkStatus
+                        echo
+                fi
+##########################
+# Funcao que realiza backup dos dados dos servidores linux usando rsync com multiplos dias
+runBackup () {
+        # Localizando o ultimo backup de arquivos valido
+        #echo -n "Localizando ultimo backup valido para uso do hard link"
+        #for LASTBACKUP in $(${LS} -1 -d "${BACKUP_TREE}"// 2>/dev/null |${SED} 's/\/$//g' |${EGREP} '.[0-9]{8}$' |${GREP} -v ${BACKUP_TODAY} |${SORT} -r); do
+        #       LAST_BACKUP="${LASTBACKUP}"
+        #       if [ -d "${LAST_BACKUP}" ] && [ $(${LS} -1 "${LAST_BACKUP}" | ${WC} -l) -gt 0 ]; then
+        #               LAST_BACKUP=${LASTBACKUP}
+        #               break;
+        #       fi
+        #done
+        #checkStatus
+
+        # Caso nao seja encontrado o ultimo diretorio de backup valido, devine como "/dev/null"
+        #[ -z ${LAST_BACKUP} ] && LAST_BACKUP=/dev/null
+
+        # Realizando o backup
+        echo 
+        echo "Backup do servidor ${SERVER_NAME} iniciado em $(${DATE} '+%d/%m/%Y') as $(${DATE} '+%H:%M:%S')"
+        echo
+        if [ ${BACKUP_TYPE} = "OSL" ]; then
+                for BACKUPDIRS in ${BACKUP_DIRS}; do
+                        echo
+                        echo -n "Realizando backup da pasta ${BACKUPDIRS}"
+                        #${RSYNC} -e "${SSH} -p ${SSH_PORT}" ${RSYNC_OPT} ${OUT_DIRS} --link-dest=${LAST_BACKUP} root@${SERVER_IP}:${BACKUPDIRS} ${BACKUP_TODAY}
+                        ${RSYNC} -e "${SSH} -p ${SSH_PORT}" ${RSYNC_OPT} ${OUT_DIRS} --delete --backup-dir=${TODAY}-${CURRENT_TIME} root@${SERVER_IP}:${BACKUPDIRS} ${BACKUP_TREE_FULL}
+                        checkStatus
+                done
+        elif [ ${BACKUP_TYPE} = "OSW" ]; then
+                mountWinBackup
+                if [ "${BACKUP_DIRS}" = "*" ] || [ -z ${BACKUP_DIRS} ]; then
+                        BACKUP_DIRS="./"
+fi
+                for DIRS in ${BACKUP_DIRS};
+                do
+                        echo
+                        echo -n "Realizando backup da pasta ${BACKUP_DIRS}"
+                        #${RSYNC} ${RSYNC_OPT} ${OUT_DIRS} --link-dest=${LAST_BACKUP} ${MOUNT_POINT}/${DIRS} ${BACKUP_TODAY}
+                        ${RSYNC} ${RSYNC_OPT} ${OUT_DIRS} --delete --backup-dir=${TODAY}-${CURRENT_TIME} ${MOUNT_POINT}/${DIRS} ${BACKUP_TREE_FULL}
+                        checkStatus
+                done
+                umountWinBackup
+        fi
+
+        # Ajustando backups diferenciais
+        if [ -d ${BACKUP_TREE_FULL}/${TODAY}-${CURRENT_TIME} ];then
+                if [ ! -d "${BACKUP_TREE_DIFF}" ]; then
+                        echo
+                        echo -n "Criando a arvore de diretorios ${BACKUP_TREE_DIFF}."
+                        if ! ${MKDIR} -p "${BACKUP_TREE_DIFF}"; then
+                                checkReturn 1 "Falha na criação de ${BACKUP_TREE_DIFF}" "Abortando"
+                        fi
+                        checkStatus
+                fi
+                echo
+                echo -n "Movendo backup diferencial para o diretorio ${BACKUP_TREE_DIFF}"
+                ${MV} ${BACKUP_TREE_FULL}/${TODAY}-${CURRENT_TIME} ${BACKUP_TREE_DIFF}/
+                #
+                # Remover backups na pasta errada - Use com cautela
+                #rm -rf ${BACKUP_TREE_FULL}/202* 
+                checkStatus
+        fi
+if [ ${DIFF_COMPACT} = YES ] || [ ${DIFF_COMPACT} = yes ]; then
+                if [ -d ${BACKUP_TREE_DIFF}/${TODAY}-${CURRENT_TIME} ]; then
+                        echo
+
+                        BACKUP_TREE_DIFF_COMPACT_FULL="${BACKUP_TREE_DIFF_COMPACT}/${CURRENT_YEAR}/${CURRENT_MONTH}"
+                        if [ ! -d "${BACKUP_TREE_DIFF_COMPACT_FULL}" ]; then
+                                echo -n "Criando a arvore de diretorios ${BACKUP_TREE_DIFF_COMPACT}."
+                                if ! ${MKDIR} -p "${BACKUP_TREE_DIFF_COMPACT_FULL}"; then
+                                        checkReturn 1 "Falha na criação de ${BACKUP_TREE_DIFF_COMPACT}" "Abortando"
+                                fi
+                                checkStatus
+                        fi
+                        echo
+                        echo -n "Compactando o backup diferentical ${BACKUP_TREE_DIFF}/${TODAY}-${CURRENT_TIME}"
+                        $TAR czf ${BACKUP_TREE_DIFF_COMPACT_FULL}/${SERVER_NAME}-DIFF-${TODAY}-${CURRENT_TIME}.tar.gz ${BACKUP_TREE_DIFF}/${TODAY}-${CURRENT_TIME} 2> /dev/null
+                        #tar -czf - rk-dc-01-Dados_DATA | split -b 200G - /srv/backup/BACKUP-FULL-COMPACT/rk-dc-01-Dados_DATA/rk-dc-01-Dados_DATA-
+                        checkStatus
+                fi
+        fi
+
+        echo
+        echo "Backup do servidor ${SERVER_NAME} finalizado em $(${DATE} '+%d/%m/%Y') as $(${DATE} '+%H:%M:%S')"
+        echo
+}
